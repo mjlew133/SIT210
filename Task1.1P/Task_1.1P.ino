@@ -12,7 +12,7 @@ bool hallwayOn = false;
 
 
 void setup() {
-  pinMode(buttonPin, INPUT);
+  pinMode(buttonPin, INPUT_PULLUP);
   pinMode(porchLight, OUTPUT);
   pinMode(hallwayLight, OUTPUT);
 }
