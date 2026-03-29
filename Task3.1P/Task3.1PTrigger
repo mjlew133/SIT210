@@ -1,0 +1,130 @@
+#include <Wire.h>
+#include <BH1750.h>
+#include <WiFiNINA.h>
+
+char ssid[] = "3b3156WiFi";
+char pass[] = "Kamasc01!";
+
+char host[] = "maker.ifttt.com";
+String iftttKey = "eygcUBN0_iia1XDci3OVx";
+
+// IFTTT event names
+String sunlightStartEvent = "sunlight_started";
+String sunlightStopEvent  = "sunlight_stopped";
+
+WiFiClient client;
+BH1750 lightMeter;
+
+// Thresholds
+const float SUNLIGHT_ON  = 100.0;
+const float SUNLIGHT_OFF = 70.0;
+
+bool sunlight = false;
+unsigned long sunlightStartMillis = 0;
+unsigned long accumulatedSunlightToday = 0;
+
+int lastDay = -1;
+
+void setup() {
+  Serial.begin(9600);
+  while (!Serial);
+
+  Wire.begin();
+
+  if (lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE)) {
+    Serial.println("BH1750 started successfully.");
+  } else {
+    Serial.println("Error: BH1750 not found.");
+    while (1);
+  }
+
+  connectToWiFi();
+}
+
+void loop() {
+  checkWiFi();
+
+  float lux = lightMeter.readLightLevel();
+  Serial.print("Light: ");
+  Serial.print(lux);
+  Serial.println(" lux");
+
+  // Sunlight starts
+  if (!sunlight && lux >= SUNLIGHT_ON) {
+    sunlight = true;
+    sunlightStartMillis = millis();
+
+    Serial.println("Sunlight detected.");
+    sendIFTTTEvent(sunlightStartEvent, String(lux), getSunlightHoursToday(), "Sunlight started");
+  }
+
+  // Sunlight stops
+  else if (sunlight && lux <= SUNLIGHT_OFF) {
+    sunlight = false;
+
+    unsigned long sessionDuration = millis() - sunlightStartMillis;
+    accumulatedSunlightToday += sessionDuration;
+
+    Serial.println("Sunlight stopped.");
+    sendIFTTTEvent(sunlightStopEvent, String(lux), getSunlightHoursToday(), "Sunlight stopped");
+  }
+
+  delay(5000); // read every 5 seconds
+}
+
+void connectToWiFi() {
+  Serial.print("Connecting to WiFi");
+
+  while (WiFi.begin(ssid, pass) != WL_CONNECTED) {
+    Serial.print(".");
+    delay(3000);
+  }
+
+  Serial.println();
+  Serial.println("Connected to WiFi");
+  Serial.print("IP: ");
+  Serial.println(WiFi.localIP());
+}
+
+void checkWiFi() {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("WiFi disconnected. Reconnecting...");
+    connectToWiFi();
+  }
+}
+
+void sendIFTTTEvent(String eventName, String value1, String value2, String value3) {
+  if (client.connect(host, 80)) {
+    String url = "/trigger/" + eventName + "/with/key/" + iftttKey +
+                 "?value1=" + value1 +
+                 "&value2=" + value2 +
+                 "&value3=" + value3;
+
+    client.print(String("GET ") + url + " HTTP/1.1\r\n" +
+                 "Host: " + host + "\r\n" +
+                 "Connection: close\r\n\r\n");
+
+    Serial.print("IFTTT event sent: ");
+    Serial.println(eventName);
+  } else {
+    Serial.println("Failed to connect to IFTTT");
+  }
+
+  delay(1000);
+  while (client.available()) {
+    char c = client.read();
+    Serial.write(c);
+  }
+  client.stop();
+}
+
+String getSunlightHoursToday() {
+  unsigned long total = accumulatedSunlightToday;
+
+  if (sunlight) {
+    total += (millis() - sunlightStartMillis);
+  }
+
+  float hours = total / 3600000.0;
+  return String(hours, 2);
+}
