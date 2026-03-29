@@ -1,0 +1,83 @@
+#include "DHT.h"
+#include <BH1750.h>
+#include <Wire.h>
+#include <WiFiNINA.h>
+#include <ThingSpeak.h>
+
+// ===== WIFI Details =====
+char ssid[] = "3b3156WiFi";
+char pass[] = "Kamasc01!";
+
+// ===== ThingSpeak =====
+unsigned long channelNumber = 3300564;
+const char * writeAPIKey = "11Y1Q5SF973K1DKY";
+
+// ===== Sensor Setup =====
+#define DHTPIN 3
+#define DHTTYPE DHT11
+DHT dht(DHTPIN, DHTTYPE);
+
+BH1750 lightMeter;
+WiFiClient client;
+
+void setup() {
+  Serial.begin(9600);
+  Wire.begin();
+  dht.begin();
+  lightMeter.begin();
+
+  Serial.println("System Starting...");
+
+  Serial.print("Connecting to WiFi...");
+  while (WiFi.begin(ssid, pass) != WL_CONNECTED) {
+    Serial.print(".");
+    delay(5000);
+  }
+
+  Serial.println("\nConnected");
+  ThingSpeak.begin(client);
+}
+
+void temp() {
+  // Read temperature
+  float temperature = dht.readTemperature();
+
+  // Temperature output
+  if (isnan(temperature)) {
+    Serial.println("Temperature: ERROR");
+  } else {
+    Serial.print("Temperature: ");
+    Serial.print(temperature);
+    Serial.println(" °C");
+  }
+
+  ThingSpeak.setField(1, temperature);
+}
+
+void light() {
+  // Read light level
+  int lightLevel = lightMeter.readLightLevel();
+
+  // Light output
+  Serial.print("Light Level: ");
+  Serial.println(lightLevel);
+
+  ThingSpeak.setField(2, lightLevel);
+}
+void loop() {
+
+  Serial.println("----- SENSOR DATA -----");
+  temp();
+  light();
+  Serial.println("------------------------\n");
+
+  int status = ThingSpeak.writeFields(channelNumber, writeAPIKey);
+  if (status == 200) {
+    Serial.println("Data sent to ThingSpeak successfully");
+  } else {
+    Serial.print("Error sending data. Code: ");
+    Serial.println(status);
+  }
+
+  delay(2000);  // update every 2 seconds
+}
