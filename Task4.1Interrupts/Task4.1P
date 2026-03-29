@@ -1,0 +1,83 @@
+#include <BH1750.h>
+#include <Wire.h>
+
+const int switchPin = 2;
+const int motionPin = 3;
+const int led1Pin = 5;
+const int led2Pin = 6;
+
+const int darkThreshold = 3;
+
+volatile bool triggered = false;
+volatile bool motionTriggered = false;
+
+BH1750 lightMeter;
+
+void ISR_switch() {
+  triggered = true;
+}
+
+void motionISR() {
+  motionTriggered = true;
+}
+
+void setup() {
+  Serial.begin(9600);
+  while (!Serial);
+
+  Wire.begin();
+
+  if (lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE)) {
+    Serial.println("BH1750 started successfully.");
+  } else {
+    Serial.println("Error: BH1750 not found.");
+    while (1);
+  }
+
+  pinMode(switchPin, INPUT_PULLUP);
+  pinMode(motionPin, INPUT);
+  pinMode(led1Pin, OUTPUT);
+  pinMode(led2Pin, OUTPUT);
+
+  digitalWrite(led1Pin, LOW);
+  digitalWrite(led2Pin, LOW);
+
+  Serial.println("Starting system...");
+  Serial.println("Wait 30 seconds for PIR to stabilise.");
+
+  delay(30000);  // PIR warm-up time
+
+  attachInterrupt(digitalPinToInterrupt(switchPin), ISR_switch, FALLING);
+  attachInterrupt(digitalPinToInterrupt(motionPin), motionISR, RISING);
+
+  Serial.println("Interrupts attached.");
+}
+
+void loop() {
+  if (triggered) {
+    triggered = false;
+    turnLightsOn();
+    Serial.println("Switch interrupt triggered!");
+  }
+
+  if (motionTriggered) {
+    noInterrupts();
+    motionTriggered = false;
+    interrupts();
+    Serial.println("Motion detected!");
+
+    int lightValue = lightMeter.readLightLevel();
+
+    if (lightValue < darkThreshold) {
+      turnLightsOn();
+      Serial.println("It is dark. Lights turned on automatically.");
+    } else {
+      Serial.println("It is not dark enough. Lights remain OFF.");
+    }
+  }
+}
+
+void turnLightsOn() {
+  digitalWrite(led1Pin, HIGH);
+  digitalWrite(led2Pin, HIGH);
+}
