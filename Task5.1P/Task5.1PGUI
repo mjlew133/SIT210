@@ -1,0 +1,53 @@
+import RPi.GPIO as GPIO
+import tkinter as tk
+
+# GPIO setup
+GPIO.setmode(GPIO.BCM)
+
+LED_LIVING = 17
+LED_BATHROOM = 27
+LED_CLOSET = 22
+
+GPIO.setup(LED_LIVING, GPIO.OUT)
+GPIO.setup(LED_BATHROOM, GPIO.OUT)
+GPIO.setup(LED_CLOSET, GPIO.OUT)
+
+def turn_off_all():
+    GPIO.output(LED_LIVING, GPIO.LOW)
+    GPIO.output(LED_BATHROOM, GPIO.LOW)
+    GPIO.output(LED_CLOSET, GPIO.LOW)
+
+def select_room():
+    turn_off_all()
+    
+    choice = room_var.get()
+    
+    if choice == "Living Room":
+        GPIO.output(LED_LIVING, GPIO.HIGH)
+    elif choice == "Bathroom":
+        GPIO.output(LED_BATHROOM, GPIO.HIGH)
+    elif choice == "Closet":
+        GPIO.output(LED_CLOSET, GPIO.HIGH)
+
+# GUI setup
+root = tk.Tk()
+root.title("Smart Light Control")
+
+room_var = tk.StringVar()
+
+tk.Label(root, text="Select Room").pack()
+
+tk.Radiobutton(root, text="Living Room", variable=room_var,
+               value="Living Room", command=select_room).pack()
+
+tk.Radiobutton(root, text="Bathroom", variable=room_var,
+               value="Bathroom", command=select_room).pack()
+
+tk.Radiobutton(root, text="Closet", variable=room_var,
+               value="Closet", command=select_room).pack()
+
+tk.Button(root, text="Exit", command=root.quit).pack()
+
+root.mainloop()
+
+GPIO.cleanup()
